@@ -1,0 +1,14 @@
+/build/
+/.tools/
+/local/*
+!/local/.gitkeep
+__pycache__/
+*.pyc
+*.dll
+*.mix
+*.exe
+*.obj
+*.o
+*.bin
+*.log
+font-diagnostic-*/

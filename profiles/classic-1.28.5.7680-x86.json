@@ -1,0 +1,85 @@
+{
+  "name": "classic-1.28.5.7680-x86",
+  "abi": "classic-font-v1",
+  "sha256": "05285a28e5c55a0be0c2948ee7e3b41426a1b6d74359b7d3ea57ea322f690420",
+  "machine": 332,
+  "timestamp": 1498869716,
+  "image_size": 14888960,
+  "clear_rva": 1452237,
+  "atlas_signature_rva": 1452224,
+  "atlas_signature": "8b7a3c837f24000f84d70000008b4a34034df8837df4008b46048b5f1c8d3488740383c6048b472c33c98945e88b473c",
+  "hooks": [
+    {
+      "id": 2,
+      "rva": 1421848,
+      "bytes": "8b473c5f5e5b",
+      "debug_only": false
+    },
+    {
+      "id": 3,
+      "rva": 1438606,
+      "bytes": "e89db7ffff",
+      "debug_only": true
+    },
+    {
+      "id": 4,
+      "rva": 1452528,
+      "bytes": "558bec8bd1",
+      "debug_only": true
+    },
+    {
+      "id": 5,
+      "rva": 1445420,
+      "bytes": "83bf8000000000",
+      "debug_only": true
+    },
+    {
+      "id": 6,
+      "rva": 1445526,
+      "bytes": "83be8000000000",
+      "debug_only": true
+    },
+    {
+      "id": 7,
+      "rva": 1445442,
+      "bytes": "75078bcfe89590ffff",
+      "debug_only": true
+    },
+    {
+      "id": 8,
+      "rva": 1445548,
+      "bytes": "75078bcee82b90ffff",
+      "debug_only": true
+    },
+    {
+      "id": 9,
+      "rva": 1416928,
+      "bytes": "558bec83ec38",
+      "debug_only": true
+    },
+    {
+      "id": 10,
+      "rva": 1420167,
+      "bytes": "8b4e388bde",
+      "debug_only": true
+    },
+    {
+      "id": 11,
+      "rva": 1420498,
+      "bytes": "8b4e388bde",
+      "debug_only": true
+    },
+    {
+      "id": 16,
+      "rva": 1452227,
+      "bytes": "837f24000f84d7000000",
+      "debug_only": true
+    },
+    {
+      "id": 17,
+      "rva": 1452407,
+      "bytes": "837df4008b423c",
+      "debug_only": true
+    }
+  ]
+}
