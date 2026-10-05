@@ -56,48 +56,46 @@ class PE:
         return found
 
 def profiles():
-    return [json.loads(p.read_text(encoding='utf-8')) for p in sorted((ROOT/'profiles').glob('*.json'))]
+    return [json.loads(p.read_text(encoding='utf-8')) for p in sorted((ROOT/'profiles').glob('classic-*.json'))]
 
 def analyze(path, available=None):
-    data = Path(path).read_bytes()
-    report = {'sha256': hashlib.sha256(data).hexdigest(), 'supported': False}
+    from locate import resolve_sections
+    data=Path(path).read_bytes()
+    report={'sha256':hashlib.sha256(data).hexdigest(),'supported':False}
     try:
-        pe = PE(data)
-        report.update(machine=pe.machine, timestamp=pe.timestamp, image_size=pe.image_size)
-        choices = profiles() if available is None else available
-        for p in choices:
-            if p['sha256'] != report['sha256']:
-                continue
-            if p['abi'] != 'classic-font-v1' or p['machine'] != pe.machine or p['timestamp'] != pe.timestamp or p['image_size'] != pe.image_size:
-                raise ValueError('Profile metadata/ABI mismatch')
-            checks = [(p['atlas_signature_rva'], p['atlas_signature'])] + [(h['rva'], h['bytes']) for h in p['hooks']]
-            for rva, signature in checks:
-                expected = bytes.fromhex(signature)
-                if pe.read_code(rva, len(expected)) != expected:
-                    raise ValueError('Profile instruction mismatch at RVA %X' % rva)
-            report.update(supported=True, profile=p['name'])
-            return report, p
-        # These are review hints, never an automatically approved new profile.
-        report['reason'] = 'Unknown SHA256; developer review required'
-        report['candidate_rvas'] = {p['name']: {'atlas': pe.candidates(bytes.fromhex(p['atlas_signature'])), 'uv_tail': pe.candidates(bytes.fromhex(p['hooks'][0]['bytes']))} for p in choices}
+        pe=PE(data)
+        report.update(machine=pe.machine,timestamp=pe.timestamp,image_size=pe.image_size)
+        sites=resolve_sections([(base,data[raw:raw+size]) for base,raw,size,flags in pe.sections if flags&0x20000000])
+        report['candidate_sites']=sites
+        for p in profiles() if available is None else available:
+            if p['sha256']!=report['sha256']:continue
+            if p['machine']!=pe.machine or p['timestamp']!=pe.timestamp or p['image_size']!=pe.image_size:
+                raise ValueError('Profile metadata mismatch')
+            if not sites or sites['abi']!=p['abi']:
+                raise ValueError('Unique locator/ABI/control-flow validation failed')
+            report.update(supported=True,profile=p['name'],debug_supported=p.get('debug_supported',False))
+            return report,p
+        report['reason']='Unknown SHA256; candidate sites are NOT authorization to patch'
     except ValueError as exc:
-        report['reason'] = str(exc)
-    return report, None
+        report['reason']=str(exc)
+    return report,None
 
-def emit_header(p, path):
-    if p['abi'] != 'classic-font-v1':
-        raise ValueError('Unsupported structure layout ABI')
-    def array(name, value):
-        return 'static const unsigned char %s[]={%s};' % (name, ','.join('0x%02x'%b for b in bytes.fromhex(value)))
-    lines = ['#pragma once', array('kExpectedHash', p['sha256']), array('kAtlasSignature', p['atlas_signature'])]
-    for key, name in [('timestamp','kTimestamp'), ('image_size','kImageSize'), ('clear_rva','kClearRva'), ('atlas_signature_rva','kAtlasSignatureRva')]:
-        lines.append('static const unsigned long %s=0x%x;' % (name,p[key]))
-    for hook in p['hooks']:
-        if hook['debug_only']: lines.append('#ifdef WC3_DEBUG')
-        lines += ['static const unsigned long kRva%d=0x%x;' % (hook['id'],hook['rva']), array('kSig%d'%hook['id'],hook['bytes'])]
-        if hook['debug_only']: lines.append('#endif')
-    Path(path).parent.mkdir(parents=True,exist_ok=True)
-    Path(path).write_text('\n'.join(lines)+'\n',encoding='utf-8')
+def emit_header(p,path):
+    from locate import emit_patterns
+    if p['abi'] not in ('frame','stack'):raise ValueError('Unsupported structure layout ABI')
+    def values(h):return ','.join('0x%02x'%v for v in bytes.fromhex(h))
+    lines=['#pragma once','struct TrustedBuild { unsigned char hash[32]; unsigned long timestamp,imageSize; unsigned abi; bool debugSupported; };','static const TrustedBuild kTrustedBuilds[]={']
+    for target in profiles():
+        lines.append('{{%s},0x%x,0x%x,%d,%s},'%(values(target['sha256']),target['timestamp'],target['image_size'],{'frame':0,'stack':1}[target['abi']],'true' if target.get('debug_supported') else 'false'))
+    lines+=['};','#ifdef WC3_DEBUG']
+    # Additional diagnostic sites remain limited to the reviewed Debug target.
+    debug=next(t for t in profiles() if t.get('debug_supported'))
+    for h in debug['hooks']:
+        if h['id']==2:continue
+        lines+=['static const unsigned long kRva%d=0x%x;'%(h['id'],h['rva']), 'static const unsigned char kSig%d[]={%s};'%(h['id'],values(h['bytes']))]
+    lines.append('#endif')
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);path.write_text('\n'.join(lines)+'\n')
+    emit_patterns(path.with_name('locator_patterns.h'))
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)

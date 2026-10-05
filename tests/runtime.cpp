@@ -48,7 +48,9 @@ static void __declspec(naked) Invoke() {
   ret
  }
 }
+void TestLocator();
 int main() {
+ TestLocator();
  void* inaccessible=VirtualAlloc(0,4096,MEM_COMMIT|MEM_RESERVE,PAGE_NOACCESS);CHECK(inaccessible);
  CHECK(!Guard([&](){ *(volatile DWORD*)inaccessible=1; }));
  bool completed=false;CHECK(Guard([&](){completed=true;}));CHECK(completed);

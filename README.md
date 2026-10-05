@@ -8,7 +8,7 @@ The output is a PE DLL named `War3FontAtlasFix.mix`, loaded by the game's existi
 
 ## Build on Linux
 
-Requirements: Linux x86_64 (Ubuntu 22.04 or newer), Python 3.9+, curl, tar, xz and sha256sum. No Windows SDK or proprietary game files are needed to build the bundled profile.
+Requirements: Linux x86_64 (Ubuntu 22.04 or newer), Python 3.9+, curl, tar, xz and sha256sum. No Windows SDK or proprietary game files are needed to build the bundled profiles.
 
 ```sh
 sh tools/setup-toolchain.sh
@@ -18,7 +18,7 @@ python3 tools/build.py --toolchain .tools/llvm-mingw-20250613-ucrt-ubuntu-22.04-
 Output: `build/release/War3FontAtlasFix.mix`.
 The toolchain download is pinned and SHA256-verified. See [build details](docs/build.md).
 
-To validate and select a profile using your own DLL:
+To validate your own DLL before building the same multi-version Release MIX:
 
 ```sh
 python3 tools/analyze.py /path/to/Game.dll
@@ -45,7 +45,9 @@ Output: `build/debug/War3FontAtlasFix.mix`. Debug adds a log, lifecycle events, 
 
 ## Compatibility and contributions
 
-Initial profile: Game.dll **1.28.5.7680, x86**. Runtime authorization uses the full SHA256, not the displayed version string. No x64 or Reforged support.
+One Release MIX supports the reviewed x86 builds **1.26.0.6401**, **1.27.0.52240** and **1.28.5.7680**. It locates repair sites at runtime using instruction signatures, ABI witnesses and branch-target checks, rather than fixed repair RVAs. Authorization still requires a reviewed SHA256; matching patterns alone do not admit unknown builds.
+
+The two hooks have been checked by native UV/CPU-atlas replay and isolated MIX loading for these three builds. This does not establish full-game behavior for every configuration. Debug's extra observation hooks remain limited to **1.28.5.7680**; Debug refuses the other builds before installing anything. No x64 or Reforged support.
 
 - [Root cause and repair](docs/root-cause.md)
 - [Adding a reviewed version profile](docs/profiles.md)

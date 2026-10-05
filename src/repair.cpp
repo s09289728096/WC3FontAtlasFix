@@ -1,3 +1,4 @@
+#include "locator.h"
 #include "guard.h"
 #include "core.h"
 #ifdef WC3_DEBUG
@@ -55,8 +56,46 @@ extern "C" __declspec(naked) void HookStub() {
 struct Registers { DWORD edi,esi,ebp,savedEsp,ebx,edx,ecx,eax,flags; };
 extern "C" void __stdcall Observe(DWORD, Registers* r) {
     if(!Guard([&]() {
-        BYTE* glyph=*(BYTE**)(r->edi+0x3c);
+        DWORD slot=g_sites.abi?r->ebx:r->edi;
+        BYTE* glyph=*(BYTE**)(slot+0x3c);
         if(glyph) InterlockedExchange((volatile LONG*)(glyph+0x24),1);
     })) {}
 }
 #endif
+
+// 1.26 omits the EBP frame; recover arguments from the original ESP.
+struct LegacyRegisters { DWORD edi,esi,ebp,savedEsp,ebx,edx,ecx,eax,flags; };
+extern "C" void __stdcall ClearLegacy(LegacyRegisters* r) {
+    if(!Guard([&]() {
+        DWORD sp=r->savedEsp+4;
+        if(*(DWORD*)(sp+0x10)!=r->ebx)return;
+        DWORD frame[16]={};BYTE* f=(BYTE*)&frame[4];
+        *(DWORD*)(f-4)=r->ebx;
+        *(DWORD*)(f-8)=*(DWORD*)(sp+0x44);
+        *(DWORD*)(f+0x10)=*(DWORD*)(sp+0x38);
+        *(DWORD*)(f+0x1c)=*(DWORD*)(sp+0x3c);
+        ClearSlot((void*)r->ebx,(void*)r->edx,f);
+    })) {}
+}
+extern "C" __declspec(naked) void LegacyClearStub() {
+ __asm {
+  pushfd
+  pushad
+  cld
+  mov ebx,esp
+  sub esp,528
+  and esp,-16
+  fxsave [esp]
+  mov esi,esp
+  push dword ptr fs:[34h]
+  push ebx
+  call ClearLegacy
+  pop eax
+  mov dword ptr fs:[34h],eax
+  fxrstor [esi]
+  mov esp,ebx
+  popad
+  popfd
+  jmp dword ptr [g_trampoline]
+ }
+}

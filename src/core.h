@@ -13,3 +13,5 @@ extern void* g_trampoline;
 extern volatile LONG g_cleared, g_skipped;
 #endif
 extern "C" void HookStub();
+
+extern "C" void LegacyClearStub();

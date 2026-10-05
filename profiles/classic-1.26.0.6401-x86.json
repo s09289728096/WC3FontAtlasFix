@@ -1,0 +1,9 @@
+{
+  "name": "classic-1.26.0.6401-x86",
+  "abi": "stack",
+  "sha256": "9fd90f92d7e71e4a53df2b49b4e2b2a1014e10c03c24952de90b7d3829ba8329",
+  "machine": 332,
+  "timestamp": 1300478720,
+  "image_size": 12275712,
+  "debug_supported": false
+}

@@ -2,12 +2,14 @@
 #define WIN32_LEAN_AND_MEAN
 #include "core.h"
 #include "profile.h"
+#include "locator.h"
 #include "diag.h"
 #include <wincrypt.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include "MinHook.h"
 static HMODULE selfModule;
+static const TrustedBuild* trustedBuild=0;
 #ifdef WC3_DEBUG
 static wchar_t logPath[MAX_PATH];
 static void Log(const char* fmt, ...) {
@@ -33,7 +35,9 @@ static bool HashMatches(HMODULE game) {
         while ((readOk=ReadFile(f,buffer,sizeof(buffer),&count,0)) && count) {
             if (!CryptHashData(hash,buffer,count,0)) { healthy=false; break; }
         }
-        ok=healthy && readOk && CryptGetHashParam(hash,HP_HASHVAL,result,&length,0) && length==32 && !memcmp(result,kExpectedHash,32);
+        if(healthy && readOk && CryptGetHashParam(hash,HP_HASHVAL,result,&length,0) && length==32) {
+            for(const TrustedBuild& build:kTrustedBuilds)if(!memcmp(result,build.hash,32)) {trustedBuild=&build;ok=true;break;}
+        }
     }
     if(hash) CryptDestroyHash(hash); if(provider) CryptReleaseContext(provider,0); CloseHandle(f); return ok;
 }
@@ -44,7 +48,7 @@ static bool MemoryMatches(HMODULE game) {
         BYTE* base=(BYTE*)game; IMAGE_DOS_HEADER* dos=(IMAGE_DOS_HEADER*)base;
         if(dos->e_magic!=IMAGE_DOS_SIGNATURE || dos->e_lfanew<=0 || dos->e_lfanew>4096) return;
         IMAGE_NT_HEADERS32* nt=(IMAGE_NT_HEADERS32*)(base+dos->e_lfanew);
-        matches=nt->Signature==IMAGE_NT_SIGNATURE && nt->FileHeader.Machine==IMAGE_FILE_MACHINE_I386 && nt->FileHeader.TimeDateStamp==kTimestamp && nt->OptionalHeader.SizeOfImage==kImageSize && !memcmp(base+kAtlasSignatureRva,kAtlasSignature,sizeof(kAtlasSignature));
+        matches=nt->Signature==IMAGE_NT_SIGNATURE && nt->FileHeader.Machine==IMAGE_FILE_MACHINE_I386 && trustedBuild && nt->FileHeader.TimeDateStamp==trustedBuild->timestamp && nt->OptionalHeader.SizeOfImage==trustedBuild->imageSize && FindRepairSites(base,&g_sites) && g_sites.abi==trustedBuild->abi;
     })) { matches=false; }
     return matches;
 }
@@ -63,12 +67,15 @@ static DWORD WINAPI Worker(void*) {
     for(unsigned i=0;i<300 && !game;++i) { game=GetModuleHandleW(L"Game.dll"); if(!game) Sleep(100); }
     if(!game) { Log("SKIP Game.dll not loaded after 30 seconds"); return 0; }
     if(!HashMatches(game)) { Log("SKIP unsupported Game.dll SHA256; no patch applied"); return 0; }
+#ifdef WC3_DEBUG
+    if(!trustedBuild->debugSupported) {Log("SKIP Debug observers are not validated for this target; use Release");return 0;}
+#endif
     if(!MemoryMatches(game)) { Log("SKIP memory signature mismatch (possible debugger breakpoint or other hook)"); return 0; }
     if(!IsProcessorFeaturePresent(PF_XMMI_INSTRUCTIONS_AVAILABLE)) { Log("SKIP FXSAVE unavailable"); return 0; }
     MH_STATUS status=MH_Initialize();
     if(status!=MH_OK) { Log("ERROR MH_Initialize: %s",MH_StatusToString(status)); return 0; }
-    void* target=(BYTE*)game+kClearRva;
-    status=MH_CreateHook(target,(void*)HookStub,&g_trampoline);
+    void* target=g_sites.clear;
+    status=MH_CreateHook(target,g_sites.abi?(void*)LegacyClearStub:(void*)HookStub,&g_trampoline);
     if(status!=MH_OK) { Log("ERROR MH_CreateHook: %s",MH_StatusToString(status)); MH_Uninitialize(); return 0; }
 #ifdef WC3_DEBUG
     wchar_t marker[MAX_PATH];wcscpy_s(marker,logPath);wchar_t* markerName=wcsrchr(marker,L'\\');
@@ -85,7 +92,7 @@ static DWORD WINAPI Worker(void*) {
 #endif
     status=MH_EnableHook(MH_ALL_HOOKS);
     if(status!=MH_OK) { Log("ERROR MH_EnableHook: %s",MH_StatusToString(status)); MH_RemoveHook(target); MH_Uninitialize(); return 0; }
-    Log("INSTALLED Game.dll=%p hook=%p strategy=clear-owned-slot-before-dirty-glyph",game,target);
+    Log("INSTALLED Game.dll=%p hook=%p strategy=clear-owned-slot-before-dirty-glyph abi=%u uv=%p",game,target,g_sites.abi,g_sites.uv);
 #ifdef WC3_DEBUG
     Log("DIAGNOSTICS folder=%ls hotkey=Ctrl+Shift+F8 capture=10s max=4",folder);
     DWORD last=GetTickCount(); bool keyWasDown=false; DWORD reportedCapture=0,reportedComplete=0;

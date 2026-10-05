@@ -12,3 +12,11 @@ These are CPU atlas lifecycle defects, so changing the graphics translation laye
 Hooks preserve x86 general registers, flags, LastError, x87 and XMM state. They are installed outside DllMain's loader lock, using MinHook trampolines. The module remains loaded for the process lifetime; updates require a restart. The file hash, image metadata and loaded instruction bytes must match the selected profile before installation.
 
 The structure offsets and calling conventions are specific to the reviewed ABI. Similar instructions in another DLL are not sufficient proof of compatibility. Debug comparisons inspect CPU alpha, not final GPU presentation, and exclude unsupported outline layouts.
+
+## Locating the repair sites
+
+`profiles/locators.json` is shared by the Python analyzer and generated C++ scanner. The scanner searches executable PE sections and requires a unique UV anchor and dirty-gate anchor from the same ABI family. It validates nearby UV operand setup, atlas entry, row-height/outline layout, dirty reset and next-slot loop. The masked dirty jump must target the next-slot block, whose backward jump must return to the matched loop anchor. Duplicate or incomplete matches are rejected.
+
+The `frame` family (reviewed 1.27/1.28) keeps the UV slot in EDI and atlas page in ESI, with EBP-relative locals. The `stack` family (reviewed 1.26) uses x87 UV calculations, keeps the UV slot and atlas page in EBX, and uses ESP-relative locals. Its clear adapter recovers the original ESP from PUSHAD's saved ESP plus four bytes for PUSHFD, then normalizes the row position/height into the common rectangle-clearing function. The glyph/slot field offsets remain the same in these reviewed targets.
+
+Signatures have no fixed module RVA. Only instruction-local offsets select the hook boundary within a validated signature. Displacements of jumps are masked for search, but their decoded targets are verified. ABI-dependent registers and structure offsets are not wildcarded. A different compiler/layout may need a new adapter even if the high-level defect is the same.

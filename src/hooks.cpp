@@ -1,5 +1,6 @@
 #include "diag.h"
 #include "profile.h"
+#include "locator.h"
 #include "MinHook.h"
 #include <string.h>
 void* trampoline2=0;
@@ -305,7 +306,7 @@ extern "C" __declspec(naked) void Stub17() {
 
 #endif
 bool DiagPrepare(BYTE* game) {
- if(memcmp(game+kRva2,kSig2,sizeof(kSig2))) return false;
+ if(!g_sites.uv) return false;
 #ifdef WC3_DEBUG
  if(memcmp(game+kRva3,kSig3,sizeof(kSig3))) return false;
 #endif
@@ -339,7 +340,7 @@ bool DiagPrepare(BYTE* game) {
 #ifdef WC3_DEBUG
  if(memcmp(game+kRva17,kSig17,sizeof(kSig17))) return false;
 #endif
- if(MH_CreateHook(game+kRva2,(void*)Stub2,&trampoline2)!=MH_OK) return false;
+ if(MH_CreateHook(g_sites.uv,(void*)Stub2,&trampoline2)!=MH_OK) return false;
 #ifdef WC3_DEBUG
  if(MH_CreateHook(game+kRva3,(void*)Stub3,&trampoline3)!=MH_OK) return false;
 #endif

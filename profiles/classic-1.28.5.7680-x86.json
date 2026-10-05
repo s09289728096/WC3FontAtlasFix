@@ -1,20 +1,11 @@
 {
   "name": "classic-1.28.5.7680-x86",
-  "abi": "classic-font-v1",
+  "abi": "frame",
   "sha256": "05285a28e5c55a0be0c2948ee7e3b41426a1b6d74359b7d3ea57ea322f690420",
   "machine": 332,
   "timestamp": 1498869716,
   "image_size": 14888960,
-  "clear_rva": 1452237,
-  "atlas_signature_rva": 1452224,
-  "atlas_signature": "8b7a3c837f24000f84d70000008b4a34034df8837df4008b46048b5f1c8d3488740383c6048b472c33c98945e88b473c",
   "hooks": [
-    {
-      "id": 2,
-      "rva": 1421848,
-      "bytes": "8b473c5f5e5b",
-      "debug_only": false
-    },
     {
       "id": 3,
       "rva": 1438606,
@@ -81,5 +72,6 @@
       "bytes": "837df4008b423c",
       "debug_only": true
     }
-  ]
+  ],
+  "debug_supported": true
 }

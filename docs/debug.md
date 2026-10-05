@@ -1,5 +1,7 @@
 # Debug mode
 
+Full diagnostics currently support only Game.dll 1.28.5.7680. The extra observation hooks use reviewed addresses for that build. Debug rejects 1.26/1.27 before installing any hook; use Release for those targets.
+
 Install the Debug MIX instead of Release, never alongside another copy of the same fix. After startup, `War3FontAtlasFix.log` reports installation or the rejection reason. A successful installation requires `MODE reallocation_dirty_fix=1` and `INSTALLED`.
 
 While the game is in the foreground, hold Ctrl+Shift+F8 for about half a second. Keep the relevant text visible for roughly 15 seconds; wait for `CAPTURE n COMPLETE io_errors=0`. A process supports four captures. Output is placed beside the MIX in `font-diagnostic-*`, with a `capture-n` directory for each archive.

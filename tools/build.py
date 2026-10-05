@@ -24,6 +24,8 @@ def main():
             raise SystemExit('Unsupported Game.dll; see analysis.json. No new MIX was built.')
     else:
         p=next(x for x in profiles() if x['name']=='classic-1.28.5.7680-x86')
+    if args.debug and not p.get('debug_supported'):
+        raise SystemExit('Debug observers not validated for this target; build Release instead.')
     emit_header(p,out/'profile.h')
     def compiler(name):
         candidate=str(args.toolchain/'bin'/name) if args.toolchain else shutil.which(name)
@@ -34,7 +36,7 @@ def main():
     # Fixed source paths avoid leaking checkout paths into the artifact.
     common=['-O2','-Wall','-Wextra','-Wno-unused-parameter','-Wno-unused-function','-fms-extensions','-fasm-blocks','-ffile-prefix-map='+str(ROOT)+'=.','-I',str(out),'-I','src','-I','vendor/minhook/include','-D_WIN32_WINNT=0x0601','-D_CRT_SECURE_NO_WARNINGS']
     if args.debug: common+=['-DWC3_DEBUG=1']
-    sources=['src/runtime.cpp','src/repair.cpp','src/hooks.cpp']
+    sources=['src/runtime.cpp','src/repair.cpp','src/hooks.cpp','src/locator.cpp']
     if args.debug: sources+=['src/diag.cpp']
     sources += ['vendor/minhook/src/'+p for p in ['buffer.c','hook.c','trampoline.c','hde/hde32.c']]
     objects=[]
@@ -48,13 +50,15 @@ def main():
     objects.append(str(guard))
     target=out/'War3FontAtlasFix.mix'
     subprocess.run([cxx,'-shared','-static','-Wl,--no-insert-timestamp','-Wl,--dynamicbase','-Wl,--nxcompat','-o',str(target),*objects,'-ladvapi32',*(['-luser32'] if args.debug else [])],cwd=ROOT,check=True)
-    manifest={'mode':'debug' if args.debug else 'release','profile':p['name'],'game_sha256':p['sha256'],'mix_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'compiler':subprocess.check_output([cxx,'--version'],text=True).splitlines()[0]}
+    manifest={'mode':'debug' if args.debug else 'release','profile':p['name'],'game_sha256':p['sha256'],'supported_profiles':[t['name'] for t in profiles() if not args.debug or t.get('debug_supported')],'locator':'masked signatures with ABI and branch-target validation','mix_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'compiler':subprocess.check_output([cxx,'--version'],text=True).splitlines()[0]}
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
     if args.tests:
-        subprocess.run([cxx,*common,'tests/runtime.cpp',*[o for o in objects if Path(o).name!='runtime.o'],'-static','-o',str(out/'runtime-test.exe'),'-ladvapi32',*(['-luser32'] if args.debug else [])],cwd=ROOT,check=True)
-        subprocess.run([cxx,*common,'tests/loader.cpp','-static','-o',str(out/'loader-test.exe')],cwd=ROOT,check=True)
+        subprocess.run([cxx,*common,'tests/runtime.cpp','tests/locator.cpp',*[o for o in objects if Path(o).name!='runtime.o'],'-static','-o',str(out/'runtime-test.exe'),'-ladvapi32',*(['-luser32'] if args.debug else [])],cwd=ROOT,check=True)
+        subprocess.run([cxx,*common,'tests/loader.cpp',str(out/'locator.o'),str(out/'guard.o'),'-static','-o',str(out/'loader-test.exe')],cwd=ROOT,check=True)
         mock=ROOT/'build/mock';mock.mkdir(exist_ok=True)
         subprocess.run([cc,'-shared','-static','tests/mock_game.c','-o',str(mock/'Game.dll')],cwd=ROOT,check=True)
+        if not args.debug:
+            subprocess.run([cxx,*common,'tests/native_replay.cpp',*[o for o in objects if Path(o).name!='runtime.o'],'-static','-ladvapi32','-o',str(out/'native-replay.exe')],cwd=ROOT,check=True)
     print(target)
 
 if __name__=='__main__': main()

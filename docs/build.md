@@ -12,11 +12,11 @@ python3 tools/build.py --debug --tests --toolchain .tools/llvm-mingw-20250613-uc
 
 Run each generated `runtime-test.exe` on Windows x86/x64. It tests a synthetic hook and atlas; no game is needed. Linux compilation alone cannot establish in-game behavior.
 
-The project uses Python's standard library as its small build driver. It compiles vendored MinHook and project sources, generates a private `profile.h` from the selected version profile, and links a Windows x86 DLL with ASLR/NX. Link timestamps are disabled and source paths are remapped. Each output directory contains `manifest.json` with the compiler identity, target Game.dll hash and MIX hash. Builds use UCRT and statically link toolchain runtime libraries.
+The project uses Python's standard library as its small build driver. It compiles vendored MinHook and project sources, generates private trust-list and locator headers from the reviewed profiles, and links a Windows x86 DLL with ASLR/NX. Link timestamps are disabled and source paths are remapped. Each output directory contains `manifest.json` with the compiler identity, validated input hash, supported profiles and MIX hash. Builds use UCRT and statically link toolchain runtime libraries.
 
 Release is the default. `--debug` is an explicit feature selection, not a request to disable optimization. Only the UV repair and rectangle-clear hooks are installed by Release. Debug additionally links diagnostics and installs observation hooks.
 
-For a supplied `--game`, profile selection and instruction verification happen before compilation. A failure does not overwrite a previously built MIX; do not mistake an older artifact for a successful new build. The generated analysis report is under the selected build directory. Without `--game`, the bundled reviewed profile is used, allowing public CI without proprietary inputs.
+For a supplied `--game`, profile selection and instruction verification happen before compilation. A failure does not overwrite a previously built MIX; do not mistake an older artifact for a successful new build. The generated analysis report is under the selected build directory. With or without `--game`, Release includes all reviewed targets and discovers hook addresses at runtime. The argument validates a local input; it does not limit Release to one hash. Public CI needs no proprietary inputs. Debug only builds for the reviewed 1.28.5.7680 observation layout.
 
 Optional Windows installation checks (replace paths as needed):
 
@@ -27,3 +27,11 @@ Optional Windows installation checks (replace paths as needed):
 ```
 
 The supported-image check maps Game.dll without initialization and checks installation of both hooks. It does not execute game rendering or replace an in-game compatibility test. Debug's unsupported check should append a SHA256 rejection to its log. Release intentionally remains silent.
+
+Optional native CPU-atlas replay (Release tests only):
+
+```powershell
+./build/release/native-replay.exe C:/private/Game.dll
+```
+
+This test requires a trusted profile and maps the local DLL without initialization. It executes only the reviewed UV calculation body and CPU atlas update using synthetic glyph pixels and allocated page buffers. It compares clean-glyph behavior against both repairs, relocates the glyph again, and checks all neighboring pixels. No game assets, private captures, rendering imports or GPU calls are needed. Do not run it on unreviewed binaries by weakening the hash check.
